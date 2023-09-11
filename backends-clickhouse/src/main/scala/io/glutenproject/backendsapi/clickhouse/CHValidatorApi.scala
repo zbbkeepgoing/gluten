@@ -24,9 +24,8 @@ import io.glutenproject.vectorized.CHNativeExpressionEvaluator
 
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.delta.DeltaLogFileIndex
-import org.apache.spark.sql.execution.{CommandResultExec, FileSourceScanExec, RDDScanExec, SparkPlan}
+import org.apache.spark.sql.execution.{FileSourceScanExec, RDDScanExec, SparkPlan}
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanHelper
-import org.apache.spark.sql.execution.datasources.v2.V2CommandExec
 
 class CHValidatorApi extends ValidatorApi with AdaptiveSparkPlanHelper {
 
@@ -75,14 +74,20 @@ class CHValidatorApi extends ValidatorApi with AdaptiveSparkPlanHelper {
       scanExec.relation.location.isInstanceOf[DeltaLogFileIndex]
     }
 
+    def includeDeltaCommand(plan: SparkPlan): Boolean = {
+      val planStr = plan.toString()
+      planStr.contains("input_file_name()") ||
+      (planStr.contains("UDF()") && planStr.contains("BroadcastExchange"))
+    }
+
     val includedUnsupportedPlans = collect(plan) {
       // case s: SerializeFromObjectExec => true
       // case d: DeserializeToObjectExec => true
       // case o: ObjectHashAggregateExec => true
       case rddScanExec: RDDScanExec if rddScanExec.nodeName.contains("Delta Table State") => true
       case f: FileSourceScanExec if includedDeltaOperator(f) => true
-      case v2CommandExec: V2CommandExec => true
-      case commandResultExec: CommandResultExec => true
+      // case v2CommandExec: V2CommandExec => true
+      case _ if includeDeltaCommand(plan) => true
     }
 
     !includedUnsupportedPlans.contains(true)

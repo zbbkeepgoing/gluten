@@ -67,6 +67,7 @@ createFileWriterWrapper(const std::string & file_uri, const std::vector<std::str
     auto context = DB::Context::createCopy(local_engine::SerializedPlanParser::global_context);
     auto write_buffer_builder = WriteBufferBuilderFactory::instance().createBuilder(poco_uri.getScheme(), context);
     auto file = OutputFormatFileUtil::createFile(context, write_buffer_builder, encoded, preferred_column_names, format_hint);
+    write_buffer_builder->build(encoded);
     return new NormalFileWriter(file, context);
 }
 

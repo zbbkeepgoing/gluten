@@ -46,7 +46,8 @@ abstract class FileFormatDataWriter(
     taskAttemptContext: TaskAttemptContext,
     committer: FileCommitProtocol,
     customMetrics: Map[String, SQLMetric])
-  extends DataWriter[InternalRow] {
+  extends DataWriter[InternalRow]
+  with Logging {
 
   /**
    * Max number of files a single task writes out due to file size. In most cases the number of
@@ -182,7 +183,15 @@ class SingleDirectoryDataWriter(
     }
 
     currentWriter.write(record)
-    statsTrackers.foreach(_.newRow(currentWriter.path, record))
+    val rowInter = record.asInstanceOf[FakeRow].batch.rowIterator()
+    while (rowInter.hasNext) {
+      try {
+        statsTrackers.foreach(_.newRow(currentWriter.path, rowInter.next()))
+      } catch {
+        case e: NoSuchElementException =>
+          logInfo(s"Exit stats tracker due to ${e.getCause}.")
+      }
+    }
     updateRecordsInFile(record)
   }
 }
@@ -432,7 +441,15 @@ class DynamicPartitionDataSingleWriter(
 
   protected def writeStripe(record: InternalRow): Unit = {
     currentWriter.write(record)
-    statsTrackers.foreach(_.newRow(currentWriter.path, record))
+    val rowInter = record.asInstanceOf[FakeRow].batch.rowIterator()
+    while (rowInter.hasNext) {
+      try {
+        statsTrackers.foreach(_.newRow(currentWriter.path, rowInter.next()))
+      } catch {
+        case e: NoSuchElementException =>
+          logInfo(s"Exit stats tracker due to ${e.getCause}.")
+      }
+    }
     updateRecordsInFile(record)
   }
 }

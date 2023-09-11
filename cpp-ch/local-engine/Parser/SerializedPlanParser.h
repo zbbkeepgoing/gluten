@@ -216,6 +216,9 @@ static const std::map<std::string, std::string> SCALAR_FUNCTIONS
        {"make_decimal", "makeDecimalSpark"},
        {"unscaled_value", "unscaleValueSpark"},
 
+       {"delta_empty_udf", "deltaEmptyUDF"},
+       {"input_file_name", "deltaEmptyUDF"},
+
        // runtime filter
        {"might_contain", "bloomFilterContains"}};
 

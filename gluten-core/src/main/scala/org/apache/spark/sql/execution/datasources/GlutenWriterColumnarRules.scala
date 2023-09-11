@@ -29,9 +29,10 @@ import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, OrderPreserving
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec
-import org.apache.spark.sql.execution.command.{CreateDataSourceTableAsSelectCommand, DataWritingCommand, DataWritingCommandExec}
+import org.apache.spark.sql.execution.command.{CreateDataSourceTableAsSelectCommand, DataWritingCommand, DataWritingCommandExec, ExecutedCommandExec}
 import org.apache.spark.sql.execution.datasources.orc.OrcFileFormat
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
+import org.apache.spark.sql.execution.datasources.v2.V1FallbackWriters
 import org.apache.spark.sql.hive.execution.{CreateHiveTableAsSelectCommand, InsertIntoHiveDirCommand, InsertIntoHiveTable}
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
@@ -145,13 +146,27 @@ object GlutenWriterColumnarRules {
 
   case class NativeWritePostRule(session: SparkSession) extends Rule[SparkPlan] {
     override def apply(p: SparkPlan): SparkPlan = p match {
+      case plan: V1FallbackWriters =>
+        if (GlutenConfig.getConf.enableNativeWriter) {
+          setLocalProperty(Some("parquet"))
+        }
+        plan.withNewChildren(plan.children.map(apply))
+      case plan @ ExecutedCommandExec(cmd) =>
+        val cmdStr = cmd.toString()
+        if (
+          cmdStr.startsWith("UpdateCommand Delta") || ((cmdStr.startsWith("DeleteCommand") ||
+            cmdStr.startsWith("MergeIntoCommand")) && cmdStr.contains("Delta"))
+        ) {
+          if (GlutenConfig.getConf.enableNativeWriter) {
+            setLocalProperty(Some("parquet"))
+          }
+          plan.withNewChildren(plan.children.map(apply))
+        } else {
+          plan.withNewChildren(plan.children.map(apply))
+        }
       case rc @ DataWritingCommandExec(cmd, child) =>
         val format = getNativeFormat(cmd)
-        session.sparkContext.setLocalProperty(
-          "staticPartitionWriteOnly",
-          BackendsApiManager.getSettings.staticPartitionWriteOnly().toString)
-        session.sparkContext.setLocalProperty("isNativeAppliable", format.isDefined.toString)
-        session.sparkContext.setLocalProperty("nativeFormat", format.getOrElse(""))
+        setLocalProperty(format)
         if (format.isDefined) {
           child match {
             // if the child is columnar, we can just wrap&transfer the columnar data
@@ -178,6 +193,14 @@ object GlutenWriterColumnarRules {
           rc.withNewChildren(rc.children.map(apply))
         }
       case plan: SparkPlan => plan.withNewChildren(plan.children.map(apply))
+    }
+
+    private def setLocalProperty(format: Option[String]) = {
+      session.sparkContext.setLocalProperty(
+        "staticPartitionWriteOnly",
+        BackendsApiManager.getSettings.staticPartitionWriteOnly().toString)
+      session.sparkContext.setLocalProperty("isNativeAppliable", format.isDefined.toString)
+      session.sparkContext.setLocalProperty("nativeFormat", format.getOrElse(""))
     }
   }
 }

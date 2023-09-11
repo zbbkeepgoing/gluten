@@ -37,7 +37,10 @@ trait GlutenFormatWriterInjectsBase extends GlutenFormatWriterInjects {
    * @return
    */
   override def executeWriterWrappedSparkPlan(plan: SparkPlan): RDD[InternalRow] = {
-    if (plan.isInstanceOf[FakeRowAdaptor]) {
+    if (plan.isInstanceOf[FakeRowAdaptor] || plan.toString().contains("DeltaInvariantChecker")) {
+      if (plan.toString().contains("DeltaInvariantChecker")) {
+        return FakeRowAdaptor(plan).execute()
+      }
       // here, the FakeRowAdaptor is simply a R2C converter
       return plan.execute()
     }

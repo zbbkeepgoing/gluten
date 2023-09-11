@@ -142,6 +142,7 @@ object CHBackendSettings extends BackendSettingsApi with Logging {
     }
     format match {
       case ParquetReadFormat => validateFilePath
+      case DeltaParquetFileFormat => validateFilePath
       case OrcReadFormat => true
       case MergeTreeReadFormat => true
       case TextReadFormat => !hasComplexType
