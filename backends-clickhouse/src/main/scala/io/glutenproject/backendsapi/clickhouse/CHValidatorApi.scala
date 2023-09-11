@@ -24,7 +24,7 @@ import io.glutenproject.vectorized.CHNativeExpressionEvaluator
 
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.delta.DeltaLogFileIndex
-import org.apache.spark.sql.execution.{CommandResultExec, FileSourceScanExec, RDDScanExec, SparkPlan}
+import org.apache.spark.sql.execution.{FileSourceScanExec, RDDScanExec, SparkPlan}
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanHelper
 import org.apache.spark.sql.execution.datasources.v2.V2CommandExec
 
@@ -82,7 +82,6 @@ class CHValidatorApi extends ValidatorApi with AdaptiveSparkPlanHelper {
       case rddScanExec: RDDScanExec if rddScanExec.nodeName.contains("Delta Table State") => true
       case f: FileSourceScanExec if includedDeltaOperator(f) => true
       case v2CommandExec: V2CommandExec => true
-      case commandResultExec: CommandResultExec => true
     }
 
     !includedUnsupportedPlans.contains(true)

@@ -46,6 +46,7 @@ public class LocalFilesNode implements Serializable {
     MergeTreeReadFormat(),
     TextReadFormat(),
     JsonReadFormat(),
+    DeltaParquetFileFormat(),
     UnknownFormat()
   }
 
@@ -136,6 +137,7 @@ public class LocalFilesNode implements Serializable {
 
       switch (fileFormat) {
         case ParquetReadFormat:
+        case DeltaParquetFileFormat:
           ReadRel.LocalFiles.FileOrFiles.ParquetReadOptions parquetReadOptions =
               ReadRel.LocalFiles.FileOrFiles.ParquetReadOptions.newBuilder()
                   .setEnableRowGroupMaxminIndex(
