@@ -22,10 +22,11 @@ import io.glutenproject.utils.CHExpressionUtil
 import io.glutenproject.validate.NativePlanValidationInfo
 import io.glutenproject.vectorized.CHNativeExpressionEvaluator
 
-import org.apache.spark.sql.catalyst.expressions.Expression
+import org.apache.spark.sql.catalyst.expressions.{Expression, ScalaUDF}
 import org.apache.spark.sql.delta.DeltaLogFileIndex
-import org.apache.spark.sql.execution.{CommandResultExec, FileSourceScanExec, RDDScanExec, SparkPlan}
+import org.apache.spark.sql.execution.{CommandResultExec, FileSourceScanExec, FilterExec, ProjectExec, RDDScanExec, SparkPlan}
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanHelper
+import org.apache.spark.sql.execution.aggregate.SortAggregateExec
 import org.apache.spark.sql.execution.datasources.v2.V2CommandExec
 
 class CHValidatorApi extends ValidatorApi with AdaptiveSparkPlanHelper {
@@ -75,6 +76,37 @@ class CHValidatorApi extends ValidatorApi with AdaptiveSparkPlanHelper {
       scanExec.relation.location.isInstanceOf[DeltaLogFileIndex]
     }
 
+    def includedDeltaUndefinedUDF(filterExec: FilterExec): Boolean = {
+      if (filterExec.condition.isInstanceOf[ScalaUDF]) {
+        return filterExec.condition.asInstanceOf[ScalaUDF].udfName.isEmpty
+      }
+      false
+    }
+
+    def includedUndefinedUDF(sortAggregateExec: SortAggregateExec): Boolean = {
+      sortAggregateExec.resultExpressions.foreach(
+        f => {
+          if (f.name.contains("UDF")) {
+            return true
+          }
+        })
+      false
+    }
+
+    def includedInputFileName(projectExec: ProjectExec): Boolean = {
+      projectExec.projectList.foreach(
+        f => {
+          if (f.toString().contains("input_file_name()")) {
+            return true
+          }
+        })
+      false
+    }
+
+    def includeDeltaCommand(plan: SparkPlan): Boolean = {
+      plan.toString().contains("AppendColumnsWithObject")
+    }
+
     val includedUnsupportedPlans = collect(plan) {
       // case s: SerializeFromObjectExec => true
       // case d: DeserializeToObjectExec => true
@@ -83,6 +115,10 @@ class CHValidatorApi extends ValidatorApi with AdaptiveSparkPlanHelper {
       case f: FileSourceScanExec if includedDeltaOperator(f) => true
       case v2CommandExec: V2CommandExec => true
       case commandResultExec: CommandResultExec => true
+      case filterExec: FilterExec if includedDeltaUndefinedUDF(filterExec) => true
+      case sortAggregateExec: SortAggregateExec if includedUndefinedUDF(sortAggregateExec) => true
+      case projectExec: ProjectExec if includedInputFileName(projectExec) => true
+      case _ if includeDeltaCommand(plan) => true
     }
 
     !includedUnsupportedPlans.contains(true)

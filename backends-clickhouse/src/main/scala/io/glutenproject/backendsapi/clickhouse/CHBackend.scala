@@ -20,7 +20,7 @@ import io.glutenproject.GlutenConfig
 import io.glutenproject.backendsapi._
 import io.glutenproject.expression.WindowFunctionsBuilder
 import io.glutenproject.substrait.rel.LocalFilesNode.ReadFileFormat
-import io.glutenproject.substrait.rel.LocalFilesNode.ReadFileFormat.{JsonReadFormat, MergeTreeReadFormat, OrcReadFormat, ParquetReadFormat, TextReadFormat}
+import io.glutenproject.substrait.rel.LocalFilesNode.ReadFileFormat.{DeltaParquetFileFormat, JsonReadFormat, MergeTreeReadFormat, OrcReadFormat, ParquetReadFormat, TextReadFormat}
 
 import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
@@ -100,6 +100,7 @@ object CHBackendSettings extends BackendSettingsApi with Logging {
 
     format match {
       case ParquetReadFormat => validateFilePath
+      case DeltaParquetFileFormat => validateFilePath
       case OrcReadFormat => true
       case MergeTreeReadFormat => true
       case TextReadFormat => true

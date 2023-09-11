@@ -251,6 +251,9 @@ object ExpressionConverter extends SQLConfHelper with Logging {
   def replaceScalaUDFWithExpressionTransformer(
       udf: ScalaUDF,
       attributeSeq: Seq[Attribute]): ExpressionTransformer = {
+    if (udf.udfName.isEmpty) {
+      throw new UnsupportedOperationException("Not supported None scala udf")
+    }
     val substraitExprName = UDFMappings.scalaUDFMap.get(udf.udfName.get)
     substraitExprName match {
       case Some(name) =>
